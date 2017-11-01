@@ -1,0 +1,32 @@
+---
+title: "p8105_hw5_bl2689"
+author: "Boxuan Li"
+date: "10/31/2017"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r loading packages, include=F}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  fig.width = 8,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+library(tidyverse)
+library(haven)
+library(ggridges)
+library(janitor)
+library(readxl)
+library(ggthemes)
+library(hexbin)
+library(rnoaa)
+library(forcats)
+library(stringr)
+
+theme_set(theme_bw())
+theme_update(legend.position = "bottom")
+```
+
