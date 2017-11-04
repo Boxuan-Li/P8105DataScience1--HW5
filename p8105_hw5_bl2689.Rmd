@@ -34,7 +34,7 @@ theme_update(legend.position = "bottom")
 
 ## Problem 1
 
-### Read the dataset and tidy it.
+_Read the dataset and tidy it._
 ```{r reading subway dataset, message=FALSE}
 Subway.ny <- GET("https://data.ny.gov/resource/hvwh-qtfg.json", 
                  query = list(`$limit` = 2000)) %>% 
@@ -43,9 +43,11 @@ Subway.ny <- GET("https://data.ny.gov/resource/hvwh-qtfg.json",
   select(., station_name, entrance_latitude, entrance_longitude, east_west_street, north_south_street, corner) %>%
   as_tibble() %>%
   clean_names()
+
+Subway.ny
 ```
 
-### Make a plot on the number of entrances.
+_Make a plot on the number of entrances._
 ```{r making plot, message=FALSE}
 Subway.ny %>%
   group_by(., station_name) %>%
@@ -54,10 +56,13 @@ Subway.ny %>%
   mutate(., station_name = fct_reorder(station_name, no_entrances)) %>%
   ggplot(., aes(x = station_name, y = no_entrances, color = station_name)) +
   geom_point(alpha = 0.5) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position='none')
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position='none') +
+  labs(title = "Number of Entrances of Subway Stations with More than 10 Entrances",
+       x = "Station name",
+       y = "Number of entrances")
 ```
 
-### Check the station name with "St".
+_Check the station name with "St"._
 ```{r counting station name, message=FALSE}
 Stations.wt.St <- Subway.ny %>%
   filter(., str_detect(station_name, "St"))
@@ -74,6 +79,7 @@ No.stations.end <- length(unique(Stations.end.St$station_name))
 * Overall, there are `r No.stations` station names containing the abbreviation “St”, among which there are `r No.stations.end` station names ending with "St".
 
 ## Problem 2
+_Read the dataset and tidy it._
 ```{r reading GOT dataset, message=FALSE}
 url.GOT <- "https://en.wikipedia.org/wiki/Game_of_Thrones"
 GOT_viewer_xml <- read_html(url.GOT)
@@ -81,4 +87,43 @@ GOT_viewer_xml <- read_html(url.GOT)
 GOT_viewers <- html_nodes(GOT_viewer_xml,css = "table")[[4]] %>%
   html_table()
 
+GOT_viewers <- GOT_viewers[,-1] %>%
+  select(., everything(), -Average) %>%
+  gather(., key = episode, value = viewers, "Ep. 1":"Ep. 10") %>%
+  as.tibble() %>%
+  clean_names() %>%
+  filter(., viewers != "N/A") %>%
+  mutate(., viewers = as.numeric(viewers), episode = str_sub(episode, 5, -1)) %>%
+  mutate(., episode = as.numeric(episode)) %>%
+  mutate(., episode = str_c("S", season, "E", episode))
+
+GOT_viewers
 ```
+
+_Make a boxplot of the number of viewers for episodes of each season._
+```{r making boxplot, message=FALSE}
+GOT_viewers %>%
+  mutate(., season = as.factor(season)) %>%
+  ggplot(aes(x = season, y = viewers, color = season)) +
+  geom_boxplot() +
+  labs(title = "Distribution of the Number of Viewers for Each Season",
+       x = "Season",
+       y = "Number of viewers") +
+  theme(legend.position='none')
+```
+
+_Fit a linear model._
+```{r building linear model, message=FALSE}
+GOT_viewers %>%
+  mutate(., season = as.factor(season)) %>%
+  mutate(., season = relevel(season, "4")) %>%
+  lm(viewers~season, .) %>%
+  broom::tidy() %>% 
+  select(-std.error, -statistic) %>% 
+  knitr::kable(digits = 3)
+```
+
+__By fitting the number of viewers into the linear regression model with the season as a categorical predictor and season 4 as the reference, it can be discovered that almost each number of viewers for each season is well fitted in the linear model except for the season 5, which has a large p-value of 0.889. Therefore, it can be concluded that the number of viewers and the season probably have linear relationship.__
+
+## Problem 3
+
