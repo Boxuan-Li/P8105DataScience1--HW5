@@ -158,7 +158,7 @@ dynamite_reviews <- map(urls, ~read_page_reviews(.x)) %>%
   bind_rows
 ```
 
-* In the dataset, there are three variables, be it `r colnames(dynamite_reviews)` included.
+* In the dataset, there are three variables, be it "`r colnames(dynamite_reviews)`" included.
 * The scraping is successful because it contains the full reviews with both rating and texts. And the dataset is clean with sufficient information for analysis.
 
 _Create a tidy text dataset using words as the token and remove stop words._
