@@ -26,6 +26,7 @@ library(rnoaa)
 library(forcats)
 library(stringr)
 library(httr)
+library(rvest)
 
 theme_set(theme_bw())
 theme_update(legend.position = "bottom")
@@ -33,3 +34,51 @@ theme_update(legend.position = "bottom")
 
 ## Problem 1
 
+### Read the dataset and tidy it.
+```{r reading subway dataset, message=FALSE}
+Subway.ny <- GET("https://data.ny.gov/resource/hvwh-qtfg.json", 
+                 query = list(`$limit` = 2000)) %>% 
+  content("text") %>%
+  jsonlite::fromJSON() %>%
+  select(., station_name, entrance_latitude, entrance_longitude, east_west_street, north_south_street, corner) %>%
+  as_tibble() %>%
+  clean_names()
+```
+
+### Make a plot on the number of entrances.
+```{r making plot, message=FALSE}
+Subway.ny %>%
+  group_by(., station_name) %>%
+  summarize(., no_entrances = n()) %>%
+  filter(., no_entrances > 10) %>%
+  mutate(., station_name = fct_reorder(station_name, no_entrances)) %>%
+  ggplot(., aes(x = station_name, y = no_entrances, color = station_name)) +
+  geom_point(alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position='none')
+```
+
+### Check the station name with "St".
+```{r counting station name, message=FALSE}
+Stations.wt.St <- Subway.ny %>%
+  filter(., str_detect(station_name, "St"))
+
+No.stations <- length(unique(Stations.wt.St$station_name))
+
+Stations.end.St <- Stations.wt.St %>%
+  mutate(., station_name_end = str_sub(station_name, -2, -1)) %>%
+  filter(., station_name_end == "St")
+
+No.stations.end <- length(unique(Stations.end.St$station_name))
+```
+
+* Overall, there are `r No.stations` station names containing the abbreviation “St”, among which there are `r No.stations.end` station names ending with "St".
+
+## Problem 2
+```{r reading GOT dataset, message=FALSE}
+url.GOT <- "https://en.wikipedia.org/wiki/Game_of_Thrones"
+GOT_viewer_xml <- read_html(url.GOT)
+
+GOT_viewers <- html_nodes(GOT_viewer_xml,css = "table")[[4]] %>%
+  html_table()
+
+```
