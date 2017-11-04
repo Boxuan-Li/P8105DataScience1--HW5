@@ -27,6 +27,8 @@ library(forcats)
 library(stringr)
 library(httr)
 library(rvest)
+library(tidytext)
+library(viridis)
 
 theme_set(theme_bw())
 theme_update(legend.position = "bottom")
@@ -126,4 +128,137 @@ GOT_viewers %>%
 __By fitting the number of viewers into the linear regression model with the season as a categorical predictor and season 4 as the reference, it can be discovered that almost each number of viewers for each season is well fitted in the linear model except for the season 5, which has a large p-value of 0.889. Therefore, it can be concluded that the number of viewers and the season probably have linear relationship.__
 
 ## Problem 3
+_Read the dataset._
+```{r reading review dataset, message=FALSE}
+read_page_reviews <- function(url) {
+  
+  h <- read_html(url)
+  
+  title <- h %>%
+    html_nodes("#cm_cr-review_list .review-title") %>%
+    html_text()
+  
+  stars <- h %>%
+    html_nodes("#cm_cr-review_list .review-rating") %>%
+    html_text() %>%
+    str_extract("\\d") %>%
+    as.numeric()
+  
+  text = h %>%
+    html_nodes(".review-data:nth-child(4)") %>%
+    html_text()
+  
+  data_frame(title, stars, text)
+}
+
+url_base <- "https://www.amazon.com/product-reviews/B00005JNBQ/ref=cm_cr_arp_d_viewopt_rvwer?ie=UTF8&reviewerType=avp_only_reviews&sortBy=recent&pageNumber="
+urls <- paste0(url_base, 1:100)
+
+dynamite_reviews <- map(urls, ~read_page_reviews(.x)) %>% 
+  bind_rows
+```
+
+* In the dataset, there are three variables, be it `r colnames(dynamite_reviews)` included.
+* The scraping is successful because it contains the full reviews with both rating and texts. And the dataset is clean with sufficient information for analysis.
+
+_Create a tidy text dataset using words as the token and remove stop words._
+```{r un-nesting the tokens, message=FALSE}
+Dynamite_words <- dynamite_reviews %>%
+  unnest_tokens(word, text)
+
+data("stop_words")
+
+Dynamite_words <- anti_join(Dynamite_words, stop_words)
+
+Dynamite_words
+```
+
+_Check the frequency of words that are used in five-star reviews and 1-star reviews._
+```{r checking frequency, message=FALSE}
+Word_used <- Dynamite_words %>%
+  filter(., stars == 1|stars == 5) %>%
+  group_by(., stars) %>%
+  count(., word, sort = T) %>%
+  select(., word, stars, n) %>%
+  ungroup()
+
+Word_fivestars <- Word_used %>%
+  filter(., stars == 5)
+
+top_n(Word_fivestars, 10)
+
+Word_onestar <- Word_used %>%
+  filter(., stars == 1)
+
+top_n(Word_onestar, 10)
+```
+
+* Therefore, in five-star reviews, "`r head(Word_fivestars$word, 10)`" are most frequently used while "`r head(Word_onestar$word, 10)`" are most commonly used in one-star reviews.
+
+_Make a plot that shows the (approximate) log odds ratio for word appearance._
+```{r making a plot of logOR, message=FALSE}
+Word_ratio <- Word_used %>%
+  spread(., key = stars, value = n, fill = 0) %>%
+  select(., word, one_star = "1", five_stars = "5") %>%
+  mutate(onestar_odds = (one_star + 1) / (sum(one_star) + 1),
+         fivestars_odds = (five_stars + 1) / (sum(five_stars) + 1),
+         log_OR = log(onestar_odds / fivestars_odds)) %>%
+  arrange(desc(log_OR))
+
+Word_ratio %>%
+  mutate(pos_log_OR = ifelse(log_OR > 0, "one star > five stars", "five stars > one star")) %>% 
+  group_by(., pos_log_OR) %>%
+  top_n(., 10, abs(log_OR)) %>%
+  ungroup() %>%
+  mutate(., word = fct_reorder(word, log_OR)) %>%
+  ggplot(., aes(x = word, y = log_OR, fill = pos_log_OR)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Log Odds Ratio for Word Appearance Comparing One-star and Five-star Reviews",
+       x = "Log odds ratio",
+       y = "Words") +
+  scale_fill_discrete(name = "")
+```
+
+_Sentiment analysis._
+```{r sentiment, message=FALSE}
+Sentiment <- get_sentiments("bing")
+
+dynamite_reviews2 <- as.data.frame(cbind(1:1000,dynamite_reviews)) %>%
+  select(., "1:1000", stars, text)
+colnames(dynamite_reviews2)[1] <- "review"
+
+Dynamite_words2 <- dynamite_reviews2 %>%
+  unnest_tokens(word, text) %>%
+  anti_join(., stop_words)
+
+Word_sentiment <- inner_join(Dynamite_words2, Sentiment) %>%
+  group_by(., review, stars) %>%
+  count(., review, sentiment) %>%
+  spread(., key = sentiment, value = n, fill = 0) %>%
+  mutate(., sentiment = positive - negative) %>%
+  ungroup() %>%
+  select(., review, stars, sentiment) %>%
+  arrange(., sentiment)
+
+Best_review <- Word_sentiment$review[dim(Word_sentiment)[1]]
+Worst_review <- Word_sentiment$review[1]
+
+Word_sentiment <- mutate(Word_sentiment, review = as.factor(review),
+                                         review = fct_reorder(review,sentiment), 
+                                         stars = paste(stars,"star"))
+  
+ggplot(Word_sentiment, aes(x = review, y = sentiment, fill = stars, color = stars)) + 
+  geom_bar(stat = "identity") + 
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  scale_fill_viridis(discrete = TRUE) + 
+  scale_color_viridis(discrete = TRUE) 
+```
+
+* The most positive review is "`r dynamite_reviews$text[Best_review]`" while the most negative review is "`r dynamite_reviews$text[Worst_review]`".
+
+
+
 
