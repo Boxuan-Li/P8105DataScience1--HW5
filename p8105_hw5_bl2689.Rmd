@@ -254,7 +254,10 @@ ggplot(Word_sentiment, aes(x = review, y = sentiment, fill = stars, color = star
         axis.text.x = element_blank(),
         axis.ticks.x = element_blank()) +
   scale_fill_viridis(discrete = TRUE) + 
-  scale_color_viridis(discrete = TRUE) 
+  scale_color_viridis(discrete = TRUE) +
+  labs(title = "Net Sentiment Value for Each Review",
+       x = "Review number",
+       y = "Sentiment value")
 ```
 
 * The most positive review is "`r dynamite_reviews$text[Best_review]`" while the most negative review is "`r dynamite_reviews$text[Worst_review]`".
